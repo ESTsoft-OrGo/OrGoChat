@@ -26,9 +26,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        room = Room.objects.get(title=self.room_name)
+        room.joinUser = room.joinUser + 1
+        room.save()
+        
         await self.accept()
 
     async def disconnect(self, close_code):
+        room = Room.objects.get(title=self.room_name)
+        room.joinUser = room.joinUser - 1
+        room.save()
+        
         # 룸 그룹 나가기
         await self.channel_layer.group_discard(
             self.room_group_name,
@@ -61,7 +69,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             writer = text_data_json['writer']
             user = User.objects.get(pk=writer)
             room = Room.objects.get(title=self.room_name)
-            message = Message.objects.create(writer=user,content=message,room=room)
+            if room.joinUser > 1:
+                message = Message.objects.create(writer=user,content=message,room=room,is_read=True)
+            else:
+                message = Message.objects.create(writer=user,content=message,room=room)
+                
             new_message = await self.message_to_json(message)
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -92,6 +104,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         for entry in messages:
             day = entry['day'].strftime('%Y.%m.%d')
             message = Message.objects.get(id=entry['id'])  # 해당 메시지 가져오기 (필요한 필드에 맞게 변경)
+            message.is_read = True
+            message.save()
             wrtier_id = message.writer.id
             dict_ = message.__dict__
             data = {
