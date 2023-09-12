@@ -23,6 +23,7 @@ class RoomList(APIView):
         for room in rooms:
             info = {}
             message = Message.objects.filter(room=room['id']).order_by('-created_at').values()
+            unread_message = Message.objects.filter(room=room['id'],is_read=False).exclude(writer=user).count()
             try:
                 message[0]
             except:
@@ -38,6 +39,7 @@ class RoomList(APIView):
             serializer = UserSerializer(target)
             info['room'] = room
             info['target'] = serializer.data
+            info['unread_message'] = unread_message
             
             room_list.append(info)
         
