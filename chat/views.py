@@ -6,24 +6,25 @@ from django.db.models import Q
 from .models import Room, Message
 from django.contrib.auth import get_user_model
 from user.serializers import UserSerializer
-from user.models import Follower
+from user.models import Follower, Blacklist
 
 User = get_user_model()
 
 
 class RoomList(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         user = request.user
-        rooms = Room.objects.filter(Q(firstuser=user) | Q(seconduser=user),is_active=True).values()
-        
+        rooms = Room.objects.filter(Q(firstuser=user) | Q(
+            seconduser=user), is_active=True).values()
+
         room_list = []
-        
+
         for room in rooms:
             info = {}
-            message = Message.objects.filter(room=room['id']).order_by('-created_at').values()
-            unread_message = Message.objects.filter(room=room['id'],is_read=False).exclude(writer=user).count()
+            message = Message.objects.filter(
+                room=room['id']).order_by('-created_at').values()
             try:
                 message[0]
             except:
@@ -35,14 +36,13 @@ class RoomList(APIView):
                 target = User.objects.get(pk=room['seconduser_id'])
             elif user.id == room['seconduser_id']:
                 target = User.objects.get(pk=room['firstuser_id'])
-            
+
             serializer = UserSerializer(target)
             info['room'] = room
             info['target'] = serializer.data
-            info['unread_message'] = unread_message
-            
+
             room_list.append(info)
-        
+
         datas = {
             "rooms": room_list
         }
@@ -51,57 +51,99 @@ class RoomList(APIView):
 
 class RoomJoin(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         user = request.user
         target = User.objects.get(pk=request.data['target'])
-        rooms = Room.objects.filter(Q(firstuser=user,seconduser=target)| Q(firstuser=target,seconduser=user),is_active=True)
-        
+        rooms = Room.objects.filter(Q(firstuser=user, seconduser=target) | Q(
+            firstuser=target, seconduser=user), is_active=True)
+
         if not rooms:
-            room = Room.objects.create(firstuser=user,seconduser=target)
+            room = Room.objects.create(firstuser=user, seconduser=target)
             room.title = f'room{room.pk}'
             room.save()
             datas = {
-                "message":"채팅방 생성 성공",
+                "message": "채팅방 생성 성공",
             }
             return Response(datas, status=status.HTTP_200_OK)
         else:
             datas = {
-                "message":"채팅방이 이미 존재합니다.",
+                "message": "채팅방이 이미 존재합니다.",
             }
             return Response(datas, status=status.HTTP_200_OK)
 
 
 class RoomDelete(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         try:
-            room = Room.objects.get(pk=request.data['target'],is_active=True)
+            room = Room.objects.get(pk=request.data['target'], is_active=True)
         except:
             datas = {
-                "message":"이미 삭제된 채팅방 입니다.",
+                "message": "이미 삭제된 채팅방 입니다.",
             }
             return Response(datas, status=status.HTTP_200_OK)
-        
+
         room.is_active = False
         room.save()
         datas = {
-            "message":"채팅방이 삭제 되었습니다..",
+            "message": "채팅방이 삭제 되었습니다..",
         }
         return Response(datas, status=status.HTTP_200_OK)
 
 
 class Following(APIView):
     permission_classes = [IsAuthenticated]
-    
-    def post(self,request):
+
+    def post(self, request):
+        user = request.user
+        my_blacklist = Blacklist.objects.get(user=user)
+        blacklist = my_blacklist.blacklist['blacklist']
+
         followings = Follower.objects.filter(follower_id=request.user)
         newFollowings = []
         for following in followings:
-            following_pf = UserSerializer(following.target_id).data
-            newFollowings.append(following_pf)
-        
+            if not following.target_id.id in blacklist:
+                user_blacklist = Blacklist.objects.get_or_create(
+                    user=following.target_id)[0]
+                u_blacklist = user_blacklist.blacklist['blacklist']
+                if not user.id in u_blacklist:
+                    following_pf = UserSerializer(following.target_id).data
+                    newFollowings.append(following_pf)
+
         response = {"following": newFollowings}
 
         return Response(data=response, status=status.HTTP_200_OK)
+
+
+class AddBlacklist(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        user_blacklist = Blacklist.objects.filter(user=user)[0]
+
+        room = Room.objects.get(pk=request.data['target'], is_active=True)
+        room.is_active = False
+        room.save()
+
+        if user.id == room.firstuser_id:
+            target = room.seconduser_id
+        elif user.id == room.seconduser_id:
+            target = room.firstuser_id
+
+        add_blacklist = user_blacklist.blacklist['blacklist']
+        if not target in add_blacklist:
+            add_blacklist.append(target)
+            user_blacklist.save()
+            datas = {
+                'message': '해당 유저를 차단하였습니다.'
+            }
+
+            return Response(data=datas, status=status.HTTP_200_OK)
+
+        datas = {
+            'message': '이미 차단한 유저입니다.'
+        }
+        return Response(data=datas, status=status.HTTP_200_OK)
