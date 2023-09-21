@@ -64,7 +64,7 @@ class Profile(models.Model):
 class Blacklist(models.Model):
     user = models.OneToOneField('User', on_delete=models.CASCADE)
     blacklist = models.JSONField(
-        default={'blacklist': []}, null=True, blank=True)
+        default={'blacklist': [], 'blacklist_profile': []}, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 

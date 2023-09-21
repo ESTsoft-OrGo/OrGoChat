@@ -5,7 +5,7 @@ from rest_framework import status
 from django.db.models import Q
 from .models import Room, Message
 from django.contrib.auth import get_user_model
-from user.serializers import UserSerializer
+from user.serializers import UserSerializer, BlacklistSerializer
 from user.models import Follower, Blacklist
 
 User = get_user_model()
@@ -98,8 +98,8 @@ class Following(APIView):
 
     def post(self, request):
         user = request.user
-        my_blacklist = Blacklist.objects.get(user=user)
-        blacklist = my_blacklist.blacklist['blacklist']
+        my_blacklist = Blacklist.objects.get_or_create(user=user)
+        blacklist = my_blacklist[0].blacklist['blacklist']
 
         followings = Follower.objects.filter(follower_id=request.user)
         newFollowings = []
@@ -112,7 +112,8 @@ class Following(APIView):
                     following_pf = UserSerializer(following.target_id).data
                     newFollowings.append(following_pf)
 
-        response = {"following": newFollowings}
+        response = {"following": newFollowings,
+                    "blacklist": BlacklistSerializer(my_blacklist[0]).data}
 
         return Response(data=response, status=status.HTTP_200_OK)
 
@@ -136,6 +137,10 @@ class AddBlacklist(APIView):
         add_blacklist = user_blacklist.blacklist['blacklist']
         if not target in add_blacklist:
             add_blacklist.append(target)
+            add_blacklistProfile = user_blacklist.blacklist['blacklist_profile']
+            target_user = User.objects.get(id=target)
+            target_serializer = UserSerializer(target_user)
+            add_blacklistProfile.append(target_serializer.data)
             user_blacklist.save()
             datas = {
                 'message': '해당 유저를 차단하였습니다.'
@@ -145,5 +150,35 @@ class AddBlacklist(APIView):
 
         datas = {
             'message': '이미 차단한 유저입니다.'
+        }
+        return Response(data=datas, status=status.HTTP_200_OK)
+
+
+class DeleteBlacklist(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        blacklist = Blacklist.objects.get(user=user)
+        target = int(request.data['target'])
+        user_blacklist = blacklist.blacklist['blacklist']
+        if target in user_blacklist:
+            user_blacklistProfile = blacklist.blacklist['blacklist_profile']
+            idx = user_blacklist.index(target)
+            user_blacklist.pop(idx)
+            profile_idx = next((index for (index, item) in enumerate(
+                user_blacklistProfile) if item['id'] == str(target)), None)
+
+            user_blacklistProfile.pop(profile_idx)
+            blacklist.save()
+
+            datas = {
+                'message': '차단이 해제되었습니다.'
+            }
+            return Response(data=datas, status=status.HTTP_200_OK)
+
+        datas = {
+            'message': '이미 해제된 유저입니다.'
         }
         return Response(data=datas, status=status.HTTP_200_OK)

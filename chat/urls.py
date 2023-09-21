@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RoomList, RoomJoin, Following, RoomDelete, AddBlacklist
+from .views import RoomList, RoomJoin, Following, RoomDelete, AddBlacklist, DeleteBlacklist
 
 urlpatterns = [
     path('', RoomList.as_view(), name='room'),
@@ -7,4 +7,5 @@ urlpatterns = [
     path('delete/', RoomDelete.as_view(), name='delete'),
     path('following/', Following.as_view(), name='follow'),
     path("blacklist/add/", AddBlacklist.as_view(), name="add_black"),
+    path("blacklist/del/", DeleteBlacklist.as_view(), name="del_black"),
 ]
