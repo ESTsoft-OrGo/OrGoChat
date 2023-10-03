@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.db.models import Q
 from .models import Room, Message
+from study.models import GroupChat, GroupMessage
 from django.contrib.auth import get_user_model
 from user.serializers import UserSerializer, BlacklistSerializer
 from user.models import Follower, Blacklist
@@ -16,15 +17,15 @@ class RoomList(APIView):
 
     def post(self, request):
         user = request.user
-        rooms = Room.objects.filter(Q(firstuser=user) | Q(
-            seconduser=user), is_active=True).values()
-
+        rooms = Room.objects.filter(Q(firstuser=user) | Q(seconduser=user), is_active=True).values()
+        groups = GroupChat.objects.filter(participants=user).values()
+        print(groups)
+        
         room_list = []
 
         for room in rooms:
             info = {}
-            message = Message.objects.filter(
-                room=room['id']).order_by('-created_at').values()
+            message = Message.objects.filter(room=room['id']).order_by('-created_at').values()
             try:
                 message[0]
             except:
@@ -43,6 +44,24 @@ class RoomList(APIView):
 
             room_list.append(info)
 
+        for group in groups:
+            info = {}
+            message = GroupMessage.objects.filter(chat=group['id']).order_by('-created_at').values()
+            try:
+                message[0]
+            except:
+                info['recent'] = {'content': '첫 메시지를 보내보세요.'}
+            else:
+                info['recent'] = message[0]
+
+            target = User.objects.get(pk=group['leader_id'])
+
+            serializer = UserSerializer(target)
+            info['room'] = group
+            info['target'] = serializer.data
+
+            room_list.append(info)
+        
         datas = {
             "rooms": room_list
         }
