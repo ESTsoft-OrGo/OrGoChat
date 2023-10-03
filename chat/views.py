@@ -68,6 +68,31 @@ class RoomList(APIView):
         return Response(datas, status=status.HTTP_200_OK)
 
 
+class Following(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        my_blacklist = Blacklist.objects.get_or_create(user=user)
+        blacklist = my_blacklist[0].blacklist['blacklist']
+        studies = Study.objects.filter(participants=user)
+        followings = Follower.objects.filter(follower_id=request.user)
+        newFollowings = []
+        for following in followings:
+            if not following.target_id.id in blacklist:
+                user_blacklist = Blacklist.objects.get_or_create(
+                    user=following.target_id)[0]
+                u_blacklist = user_blacklist.blacklist['blacklist']
+                if not user.id in u_blacklist:
+                    following_pf = UserSerializer(following.target_id).data
+                    newFollowings.append(following_pf)
+
+        response = {"following": newFollowings,
+                    "blacklist": BlacklistSerializer(my_blacklist[0]).data,
+                    "study": StudySerializer(studies,many=True).data}
+        return Response(data=response, status=status.HTTP_200_OK)
+
+
 class RoomJoin(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -112,29 +137,50 @@ class RoomDelete(APIView):
         return Response(datas, status=status.HTTP_200_OK)
 
 
-class Following(APIView):
+class GroupChatJoin(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = request.user
-        my_blacklist = Blacklist.objects.get_or_create(user=user)
-        blacklist = my_blacklist[0].blacklist['blacklist']
+        study_id = request.data.get('target')
 
-        followings = Follower.objects.filter(follower_id=request.user)
-        newFollowings = []
-        for following in followings:
-            if not following.target_id.id in blacklist:
-                user_blacklist = Blacklist.objects.get_or_create(
-                    user=following.target_id)[0]
-                u_blacklist = user_blacklist.blacklist['blacklist']
-                if not user.id in u_blacklist:
-                    following_pf = UserSerializer(following.target_id).data
-                    newFollowings.append(following_pf)
+        try:
+            group_chat = GroupChat.objects.get(study=study_id,is_active=True)
+        except GroupChat.DoesNotExist:
+            datas = {
+                "message": "존재하지 않는 채팅방입니다.",
+            }
+            return Response(datas, status=status.HTTP_400_BAD_REQUEST)
+        
+        group_chat.participants.add(user)
 
-        response = {"following": newFollowings,
-                    "blacklist": BlacklistSerializer(my_blacklist[0]).data}
+        datas = {
+            "message": "단체 채팅방에 참가하였습니다.",
+        }
+        return Response(datas, status=status.HTTP_200_OK)
+    
 
-        return Response(data=response, status=status.HTTP_200_OK)
+class GroupChatLeave(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        group_chat_id = request.data.get('group_chat_id')
+
+        try:
+            group_chat = GroupChat.objects.get(id=group_chat_id, participants=user)
+        except GroupChat.DoesNotExist:
+            datas = {
+                "message": "단체 채팅방을 찾을 수 없거나 소속되어 있지 않습니다.",
+            }
+            return Response(datas, status=status.HTTP_400_BAD_REQUEST)
+        
+        group_chat.participants.remove(user)
+        
+        datas = {
+            "message": '단체 채팅방을 떠났습니다.',
+        }
+        return Response(datas, status=status.HTTP_200_OK)
 
 
 class AddBlacklist(APIView):
