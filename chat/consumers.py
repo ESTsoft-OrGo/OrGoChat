@@ -194,7 +194,7 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             writer = text_data_json['writer']
             user = User.objects.get(pk=writer)
             room = GroupChat.objects.get(title=self.room_name)
-            message = GroupMessage.objects.create(writer=user,content=message,room=room)
+            message = GroupMessage.objects.create(writer=user,content=message,chat=room)
             new_message = await self.message_to_json(message)
             await self.channel_layer.group_send(
                 self.room_group_name,
