@@ -4,6 +4,7 @@ from .models import Room, Message
 from study.models import GroupChat, GroupMessage
 from django.contrib.auth import get_user_model
 from django.db.models.functions import TruncDay
+from user.serializers import UserSerializer
 
 User = get_user_model()
 
@@ -113,12 +114,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = Message.objects.get(id=entry['id'])
             message.is_read = True
             message.save()
-            wrtier_id = message.writer.id
+            wrtier = User.objects.get(id=message.writer.id)
             dict_ = message.__dict__
             data = {
                 "content": dict_['content'],
                 "created_at": str(dict_['created_at']),
-                "writer": wrtier_id
+                "writer": UserSerializer(wrtier).data
             }
             if day not in message_grouped_by_day:
                 message_grouped_by_day[day] = [data]
@@ -129,12 +130,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def message_to_json(self, message):
         result = []
-        wrtier_id = message.writer.id
+        wrtier = User.objects.get(id=message.writer.id)
         dict_ = message.__dict__
         data = {
             "content": dict_['content'],
             "created_at": str(dict_['created_at']),
-            "writer": wrtier_id
+            "writer": UserSerializer(wrtier).data
         }
         result.append(data)
         return result
@@ -225,12 +226,12 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         for entry in messages:
             day = entry['day'].strftime('%Y.%m.%d')
             message = GroupMessage.objects.get(id=entry['id'])  # 해당 메시지 가져오기 (필요한 필드에 맞게 변경)
-            wrtier_id = message.writer.id
+            wrtier = User.objects.get(id=message.writer.id)
             dict_ = message.__dict__
             data = {
                 "content": dict_['content'],
                 "created_at": str(dict_['created_at']),
-                "writer": wrtier_id
+                "writer": UserSerializer(wrtier).data
             }
             if day not in message_grouped_by_day:
                 message_grouped_by_day[day] = [data]
@@ -241,12 +242,12 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
     
     async def message_to_json(self, message):
         result = []
-        wrtier_id = message.writer.id
+        wrtier = User.objects.get(id=message.writer.id)
         dict_ = message.__dict__
         data = {
             "content": dict_['content'],
             "created_at": str(dict_['created_at']),
-            "writer": wrtier_id
+            "writer": UserSerializer(wrtier).data
         }
         result.append(data)
         return result
