@@ -4,7 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.db.models import Q
 from .models import Room, Message
-from study.models import GroupChat, GroupMessage
+from study.models import GroupChat, GroupMessage, Study
+from study.serializers import StudySerializer
 from django.contrib.auth import get_user_model
 from user.serializers import UserSerializer, BlacklistSerializer
 from user.models import Follower, Blacklist
@@ -19,7 +20,6 @@ class RoomList(APIView):
         user = request.user
         rooms = Room.objects.filter(Q(firstuser=user) | Q(seconduser=user), is_active=True).values()
         groups = GroupChat.objects.filter(participants=user).values()
-        print(groups)
         
         room_list = []
 
@@ -54,9 +54,9 @@ class RoomList(APIView):
             else:
                 info['recent'] = message[0]
 
-            target = User.objects.get(pk=group['leader_id'])
+            target = Study.objects.get(pk=group['study_id'])
 
-            serializer = UserSerializer(target)
+            serializer = StudySerializer(target)
             info['room'] = group
             info['target'] = serializer.data
 
