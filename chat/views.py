@@ -16,7 +16,7 @@ User = get_user_model()
 class RoomList(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def get(self, request):
         user = request.user
         rooms = Room.objects.filter(Q(firstuser=user) | Q(seconduser=user), is_active=True).values()
         groups = GroupChat.objects.filter(participants=user).values()
@@ -73,7 +73,7 @@ class RoomList(APIView):
 class Following(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def get(self, request):
         user = request.user
         my_blacklist = Blacklist.objects.get_or_create(user=user)
         blacklist = my_blacklist[0].blacklist['blacklist']
@@ -122,7 +122,7 @@ class RoomJoin(APIView):
 class RoomDelete(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def delete(self, request):
         try:
             room = Room.objects.get(pk=request.data['target'], is_active=True)
         except:
@@ -165,7 +165,7 @@ class GroupChatJoin(APIView):
 class GroupChatLeave(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def delete(self, request):
         user = request.user
         group_chat_id = request.data.get('group_chat_id')
 
@@ -224,7 +224,7 @@ class AddBlacklist(APIView):
 class DeleteBlacklist(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def delete(self, request):
         user = request.user
 
         blacklist = Blacklist.objects.get(user=user)
